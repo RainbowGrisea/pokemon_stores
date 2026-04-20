@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokemon Store Checker</title>
+    <style>
+      :root {
+        --bg: #f2efe9;
+        --paper: #fffaf0;
+        --ink: #1f2933;
+        --muted: #5c6b73;
+        --accent: #b45309;
+        --ok: #0f766e;
+        --bad: #b91c1c;
+        --warn: #92400e;
+        --line: #e8dcc7;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 15% 10%, #f6e7c5 0, transparent 35%),
+          radial-gradient(circle at 90% 20%, #f9d7c6 0, transparent 30%),
+          var(--bg);
+      }
+
+      .wrap {
+        width: min(1100px, 92vw);
+        margin: 24px auto 48px;
+      }
+
+      .hero {
+        background: linear-gradient(135deg, #fff7e6, #ffe8d6);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(26px, 4vw, 40px);
+        letter-spacing: 0.5px;
+      }
+
+      .sub {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .controls {
+        margin-top: 16px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 18px;
+        font-weight: 700;
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      label {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        color: var(--muted);
+      }
+
+      .status {
+        color: var(--muted);
+        min-height: 22px;
+        margin-top: 8px;
+      }
+
+      .cards {
+        margin-top: 16px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .card {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px;
+      }
+
+      .site {
+        margin: 0 0 8px;
+        word-break: break-word;
+        color: #7c2d12;
+      }
+
+      .counts {
+        font-size: 14px;
+        margin-bottom: 10px;
+        color: var(--muted);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .ok { color: var(--ok); }
+      .bad { color: var(--bad); }
+      .warn { color: var(--warn); }
+
+      .raw {
+        margin-top: 8px;
+        white-space: pre-wrap;
+        background: #fff;
+        border: 1px dashed var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        font: 13px/1.45 ui-monospace, Menlo, Consolas, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="hero">
+        <h1>Pokemon Stock Dashboard</h1>
+        <p class="sub">Run a full stock check across all stores from your default pages array.</p>
+
+        <div class="controls">
+          <div class="row">
+            <button id="runBtn">Check All Stores</button>
+            <label><input id="availableOnly" type="checkbox" /> Available only</label>
+          </div>
+        </div>
+
+        <div id="status" class="status"></div>
+      </section>
+
+      <section id="results" class="cards"></section>
+    </div>
+
+    <script>
+      const runBtn = document.getElementById("runBtn");
+      const statusEl = document.getElementById("status");
+      const resultsEl = document.getElementById("results");
+      const availableOnlyEl = document.getElementById("availableOnly");
+
+      function lineToClass(stock) {
+        if (stock === "In stock ✅") return "ok";
+        if (stock === "Out of stock ❌") return "bad";
+        return "warn";
+      }
+
+      function render(data) {
+        resultsEl.innerHTML = "";
+
+        for (const site of data.results) {
+          const card = document.createElement("article");
+          card.className = "card";
+
+          const hasItems = site.items.length > 0;
+
+          card.innerHTML = `
+            <h3 class="site">${site.url}</h3>
+            <div class="counts">
+              In stock: ${site.counts.inStock} | Out of stock: ${site.counts.outOfStock} | Unclear: ${site.counts.unclear}
+            </div>
+            ${hasItems ? `<ul>${site.items.map(item => `<li class="${lineToClass(item.stock)}">${item.title} - ${item.stock}</li>`).join("")}</ul>` : `<div class="raw">${site.raw}</div>`}
+          `;
+
+          resultsEl.appendChild(card);
+        }
+      }
+
+      async function runCheck() {
+        runBtn.disabled = true;
+        statusEl.textContent = "Checking all stores...";
+
+        try {
+          const response = await fetch("/api/check-default", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              availableOnly: availableOnlyEl.checked
+            })
+          });
+
+          const contentType = response.headers.get("content-type") || "";
+          const isJson = contentType.includes("application/json");
+          const data = isJson
+            ? await response.json()
+            : { error: `Expected JSON but received ${contentType || "unknown content type"}` };
+
+          if (!response.ok) {
+            throw new Error(data.error || "Request failed");
+          }
+
+          if (!isJson) {
+            throw new Error(data.error || "Server returned a non-JSON response");
+          }
+
+          statusEl.textContent = `Finished at ${new Date(data.checkedAt).toLocaleString()}`;
+          render(data);
+        } catch (error) {
+          statusEl.textContent = `Error: ${error.message}`;
+        } finally {
+          runBtn.disabled = false;
+        }
+      }
+
+      runBtn.addEventListener("click", runCheck);
+    </script>
+  </body>
+</html>

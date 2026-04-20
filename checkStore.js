@@ -1014,27 +1014,29 @@ async function checkPages(urls, options = {}) {
   return results;
 }
 
+function getDefaultPages() {
+  return [
+    "https://www.metagames.hu/gyujtogetos-kartyajatekok/pokemon-tcg?kereses=elite+trainer+box&categoryId=pokemon-tcg&pageSize=48",
+    "https://gamerunner.hu/kereses?description=1&keyword=elite+trainer+box",
+    "https://sportkartyabolt.hu/shop_search.php?search=elite+trainer+box",
+    "https://momokoshop.hu/?s=elite+trainer+box&post_type=product&product_cat&product_count=104",
+    "https://reflexshop.hu/shop_search.php?search=elite+trainer+box",
+    "https://pokeka.hu/search?q=elite+trainer+box&options%5Bprefix%5D=last",
+    "https://www.cardverse.hu/termekkategoria/gyujtogetos-kartyajatekok/?_s=elite%20trainer%20box&_cat=gyujtogetos-kartyajatekok&_brand=pokemon-tcg&~1",
+    "https://mythgames.eu/search?filter.p.product_type=Elite+Trainer+Box&options%5Bprefix%5D=last&options%5Bunavailable_products%5D=last&q=elite+trainer+box&sort_by=relevance&type=product",
+    "https://cobracard.hu/?s=elite+trainber+box&post_type=product&dgwt_wcas=1"
+
+    // "https://www.gemklub.hu/index.php?route=product%2Flist&description=0&keyword=elite+trainer+box",
+    // "https://pokedom.hu/akcios-termekek-206/elite-trainer-boksz-268",
+  ];
+}
+
 if (require.main === module) {
   const args = process.argv.slice(2);
   const availableOnly = args.includes("--available-only") || args.includes("--in-stock-only");
   const pages = args.filter(arg => !arg.startsWith("--"));
 
-  const defaultPages = [
-    // "https://www.metagames.hu/gyujtogetos-kartyajatekok/pokemon-tcg?kereses=elite+trainer+box&categoryId=pokemon-tcg&pageSize=48",
-    // "https://gamerunner.hu/kereses?description=1&keyword=elite+trainer+box",
-    // "https://sportkartyabolt.hu/shop_search.php?search=elite+trainer+box",
-    // "https://momokoshop.hu/?s=elite+trainer+box&post_type=product&product_cat&product_count=104",
-    // "https://reflexshop.hu/shop_search.php?search=elite+trainer+box",
-    // "https://pokeka.hu/search?q=elite+trainer+box&options%5Bprefix%5D=last",
-    // "https://www.cardverse.hu/termekkategoria/gyujtogetos-kartyajatekok/?_s=elite%20trainer%20box&_cat=gyujtogetos-kartyajatekok&_brand=pokemon-tcg&~1",
-    // "https://mythgames.eu/search?filter.p.product_type=Elite+Trainer+Box&options%5Bprefix%5D=last&options%5Bunavailable_products%5D=last&q=elite+trainer+box&sort_by=relevance&type=product",
-        "https://cobracard.hu/?s=elite+trainber+box&post_type=product&dgwt_wcas=1"
-
-    // "https://www.gemklub.hu/index.php?route=product%2Flist&description=0&keyword=elite+trainer+box",
-    // "https://pokedom.hu/akcios-termekek-206/elite-trainer-boksz-268",
-  ];
-
-  const urls = pages.length > 0 ? pages : defaultPages;
+  const urls = pages.length > 0 ? pages : getDefaultPages();
 
   checkPages(urls, { availableOnly }).then(results => {
     for (const { url, result } of results) {
@@ -1044,4 +1046,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { checkStock, checkPages };
+module.exports = { checkStock, checkPages, getDefaultPages };
