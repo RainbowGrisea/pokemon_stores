@@ -153,6 +153,10 @@ function isReflexshopUrl(url) {
   return /reflexshop\.hu/i.test(url || "");
 }
 
+function isPokekaUrl(url) {
+  return /pokeka\.hu/i.test(url || "");
+}
+
 function buildGamerunnerSearchUrl(keyword) {
   const sessionId = `session-${randomUUID()}`;
   const userId = randomUUID();
@@ -415,6 +419,43 @@ function extractReflexshopProducts($) {
       if (!/In stock|Out of stock/i.test(stock)) return;
 
       const key = normalizeText(title);
+      if (seen.has(key)) return;
+
+      seen.add(key);
+      products.push({ title, stock });
+    });
+
+  return products;
+}
+
+function classifyPokekaStock(text) {
+  const stock = classifyStock(text || "");
+  if (/Out of stock/i.test(stock)) {
+    return "Out of stock ❌";
+  }
+
+  return "In stock ✅";
+}
+
+function extractPokekaProducts($) {
+  const products = [];
+  const seen = new Set();
+
+  $("a[href*='/products/']")
+    .each((_, link) => {
+      const href = $(link).attr("href") || "";
+      const title = cleanProductText($(link).text() || $(link).attr("title") || "");
+      const context = $(link)
+        .closest("li, article, .grid__item, .card-wrapper, .card")
+        .text()
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (!href || !title || title.length < 8) return;
+
+      const stock = classifyPokekaStock(context || title);
+      const key = normalizeText(href);
+
       if (seen.has(key)) return;
 
       seen.add(key);
@@ -738,6 +779,26 @@ async function checkStock(url, options = {}) {
         return "No matching products found ❌";
       }
 
+      if (isPokekaUrl(url)) {
+        const pokekaProducts = extractPokekaProducts($);
+        const { products } = formatProducts(pokekaProducts, options);
+
+        if (products.length > 0) {
+          return products.map(product => `${product.title} - ${product.stock}`).join("\n");
+        }
+
+        if (options.availableOnly && pokekaProducts.length > 0) {
+          return "No available products found ❌";
+        }
+
+        const pageText = $("body").text();
+        if (hasNoResultsSignal(pageText)) {
+          return "No matching products found ❌";
+        }
+
+        return "No matching products found ❌";
+      }
+
     const productLinks = $("a[href*='pid'], [data-product-id] a[href], .product a[href], .product-item a[href], .product-layout a[href], .product-thumb a[href], .product-grid a[href], .product-list a[href]")
       .map((_, link) => ({
         href: $(link).attr("href"),
@@ -825,6 +886,7 @@ if (require.main === module) {
     // "https://sportkartyabolt.hu/shop_search.php?search=elite+trainer+box",
     // "https://momokoshop.hu/?s=elite+trainer+box&post_type=product&product_cat&product_count=104",
     // "https://reflexshop.hu/shop_search.php?search=elite+trainer+box",
+    "https://pokeka.hu/search?q=elite+trainer+box&options%5Bprefix%5D=last",
 
     // "https://pokedom.hu/akcios-termekek-206/elite-trainer-boksz-268",
 
