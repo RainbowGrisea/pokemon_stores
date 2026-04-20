@@ -886,10 +886,12 @@ if (require.main === module) {
     // "https://sportkartyabolt.hu/shop_search.php?search=elite+trainer+box",
     // "https://momokoshop.hu/?s=elite+trainer+box&post_type=product&product_cat&product_count=104",
     // "https://reflexshop.hu/shop_search.php?search=elite+trainer+box",
-    "https://pokeka.hu/search?q=elite+trainer+box&options%5Bprefix%5D=last",
+    // "https://pokeka.hu/search?q=elite+trainer+box&options%5Bprefix%5D=last",
+    "https://www.cardverse.hu/termekkategoria/gyujtogetos-kartyajatekok/?_s=elite%20trainer%20box&_cat=gyujtogetos-kartyajatekok&_brand=pokemon-tcg&~1",
+    
 
+    // "https://www.gemklub.hu/index.php?route=product%2Flist&description=0&keyword=elite+trainer+box",
     // "https://pokedom.hu/akcios-termekek-206/elite-trainer-boksz-268",
-
   ];
 
   const urls = pages.length > 0 ? pages : defaultPages;
