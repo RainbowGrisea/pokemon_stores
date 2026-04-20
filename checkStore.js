@@ -161,6 +161,10 @@ function isMythgamesUrl(url) {
   return /mythgames\.(eu|hu)/i.test(url || "");
 }
 
+function isCobracardUrl(url) {
+  return /cobracard\.hu/i.test(url || "");
+}
+
 function buildGamerunnerSearchUrl(keyword) {
   const sessionId = `session-${randomUUID()}`;
   const userId = randomUUID();
@@ -498,6 +502,59 @@ function extractMythgamesProducts($) {
       const stock = classifyMythgamesStock(context || title);
       const key = normalizeText(href);
 
+      if (seen.has(key)) return;
+
+      seen.add(key);
+      products.push({ title, stock });
+    });
+
+  return products;
+}
+
+function extractCobracardProducts($) {
+  const products = [];
+  const seen = new Set();
+
+  $("li.product")
+    .each((_, element) => {
+      const card = $(element);
+      const cardClass = normalizeText(card.attr("class") || "");
+
+      const candidateTitleLinks = card
+        .find("a[href*='/termek/']")
+        .map((__, link) => {
+          const text = ($(link).text() || "").replace(/\s+/g, " ").trim();
+          return {
+            text,
+            href: $(link).attr("href") || ""
+          };
+        })
+        .get()
+        .filter(item => item.href)
+        .filter(item => item.text.length >= 8)
+        .filter(item => !/^out of stock$/i.test(item.text))
+        .filter(item => !/tov[aá]bb olvasom|term[eé]kr[oő]l t[oö]bb inform[aá]ci[oó]/i.test(item.text));
+
+      const bestTitleLink = candidateTitleLinks.sort((a, b) => b.text.length - a.text.length)[0];
+      if (!bestTitleLink) return;
+
+      const title = cleanProductText(bestTitleLink.text.replace(/\s*out of stock\s*$/i, "").trim());
+      const context = card.text().replace(/\s+/g, " ").trim();
+
+      if (!title || title.length < 8) return;
+      if (!/pokemon|pok[eé]mon/i.test(title)) return;
+
+      const stock = /outofstock|out-of-stock|sold out|elfogyott|nincs készleten|nincs raktáron|nem elérhető/i.test(cardClass)
+        || /out of stock|sold out|elfogyott|nincs készleten|nincs raktáron|nem elérhető|tov[aá]bb olvasom/i.test(context)
+        ? "Out of stock ❌"
+        : /instock|in-stock|készleten|raktáron|kosárba|add to cart/i.test(cardClass)
+          || /k[oö]s[aá]rba teszem|k[oö]s[aá]rba|készleten|raktáron|add to cart|in stock/i.test(context)
+          ? "In stock ✅"
+          : "Stock status unclear ⚠️";
+
+      if (!/In stock|Out of stock/i.test(stock)) return;
+
+      const key = normalizeText(bestTitleLink.href || title);
       if (seen.has(key)) return;
 
       seen.add(key);
@@ -861,6 +918,26 @@ async function checkStock(url, options = {}) {
         return "No matching products found ❌";
       }
 
+      if (isCobracardUrl(url)) {
+        const cobracardProducts = extractCobracardProducts($);
+        const { products } = formatProducts(cobracardProducts, options);
+
+        if (products.length > 0) {
+          return products.map(product => `${product.title} - ${product.stock}`).join("\n");
+        }
+
+        if (options.availableOnly && cobracardProducts.length > 0) {
+          return "No available products found ❌";
+        }
+
+        const pageText = $("body").text();
+        if (hasNoResultsSignal(pageText)) {
+          return "No matching products found ❌";
+        }
+
+        return "No matching products found ❌";
+      }
+
     const productLinks = $("a[href*='pid'], [data-product-id] a[href], .product a[href], .product-item a[href], .product-layout a[href], .product-thumb a[href], .product-grid a[href], .product-list a[href]")
       .map((_, link) => ({
         href: $(link).attr("href"),
@@ -951,7 +1028,7 @@ if (require.main === module) {
     // "https://pokeka.hu/search?q=elite+trainer+box&options%5Bprefix%5D=last",
     // "https://www.cardverse.hu/termekkategoria/gyujtogetos-kartyajatekok/?_s=elite%20trainer%20box&_cat=gyujtogetos-kartyajatekok&_brand=pokemon-tcg&~1",
     // "https://mythgames.eu/search?filter.p.product_type=Elite+Trainer+Box&options%5Bprefix%5D=last&options%5Bunavailable_products%5D=last&q=elite+trainer+box&sort_by=relevance&type=product",
-
+        "https://cobracard.hu/?s=elite+trainber+box&post_type=product&dgwt_wcas=1"
 
     // "https://www.gemklub.hu/index.php?route=product%2Flist&description=0&keyword=elite+trainer+box",
     // "https://pokedom.hu/akcios-termekek-206/elite-trainer-boksz-268",
