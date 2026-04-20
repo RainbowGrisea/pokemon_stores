@@ -157,6 +157,10 @@ function isPokekaUrl(url) {
   return /pokeka\.hu/i.test(url || "");
 }
 
+function isMythgamesUrl(url) {
+  return /mythgames\.(eu|hu)/i.test(url || "");
+}
+
 function buildGamerunnerSearchUrl(keyword) {
   const sessionId = `session-${randomUUID()}`;
   const userId = randomUUID();
@@ -328,7 +332,7 @@ function extractMomokoshopProducts($) {
       const context = card.text().replace(/\s+/g, " ").trim();
 
       if (!title || title.length < 8) return;
-      if (!/pokemon|pok[eé]mon|elite trainer box|etb|booster|tin|collection|box|card/i.test(title)) return;
+      if (!/pokemon|pok[eé]mon/i.test(title)) return;
 
       let stock = "Stock status unclear ⚠️";
 
@@ -454,6 +458,44 @@ function extractPokekaProducts($) {
       if (!href || !title || title.length < 8) return;
 
       const stock = classifyPokekaStock(context || title);
+      const key = normalizeText(href);
+
+      if (seen.has(key)) return;
+
+      seen.add(key);
+      products.push({ title, stock });
+    });
+
+  return products;
+}
+
+function classifyMythgamesStock(text) {
+  const normalized = normalizeText(text || "");
+
+  if (/sold out|out of stock|elfogyott|nincs készleten|nincs raktáron|nem elérhető|nem rendelhető/i.test(normalized)) {
+    return "Out of stock ❌";
+  }
+
+  return "In stock ✅";
+}
+
+function extractMythgamesProducts($) {
+  const products = [];
+  const seen = new Set();
+
+  $("a.hdt-card-product__title[href*='/products/']")
+    .each((_, element) => {
+      const titleLink = $(element);
+      const card = titleLink.closest(".hdt-card-product");
+      const href = titleLink.attr("href") || "";
+      const title = cleanProductText(titleLink.text() || titleLink.attr("title") || card.text());
+      const context = card.length ? card.text().replace(/\s+/g, " ").trim() : titleLink.parent().text().replace(/\s+/g, " ").trim();
+
+      if (!href) return;
+      if (!title || title.length < 8) return;
+      if (!/pokemon|pok[eé]mon/i.test(title)) return;
+
+      const stock = classifyMythgamesStock(context || title);
       const key = normalizeText(href);
 
       if (seen.has(key)) return;
@@ -799,6 +841,26 @@ async function checkStock(url, options = {}) {
         return "No matching products found ❌";
       }
 
+      if (isMythgamesUrl(url)) {
+        const mythgamesProducts = extractMythgamesProducts($);
+        const { products } = formatProducts(mythgamesProducts, options);
+
+        if (products.length > 0) {
+          return products.map(product => `${product.title} - ${product.stock}`).join("\n");
+        }
+
+        if (options.availableOnly && mythgamesProducts.length > 0) {
+          return "No available products found ❌";
+        }
+
+        const pageText = $("body").text();
+        if (hasNoResultsSignal(pageText)) {
+          return "No matching products found ❌";
+        }
+
+        return "No matching products found ❌";
+      }
+
     const productLinks = $("a[href*='pid'], [data-product-id] a[href], .product a[href], .product-item a[href], .product-layout a[href], .product-thumb a[href], .product-grid a[href], .product-list a[href]")
       .map((_, link) => ({
         href: $(link).attr("href"),
@@ -887,8 +949,9 @@ if (require.main === module) {
     // "https://momokoshop.hu/?s=elite+trainer+box&post_type=product&product_cat&product_count=104",
     // "https://reflexshop.hu/shop_search.php?search=elite+trainer+box",
     // "https://pokeka.hu/search?q=elite+trainer+box&options%5Bprefix%5D=last",
-    "https://www.cardverse.hu/termekkategoria/gyujtogetos-kartyajatekok/?_s=elite%20trainer%20box&_cat=gyujtogetos-kartyajatekok&_brand=pokemon-tcg&~1",
-    
+    // "https://www.cardverse.hu/termekkategoria/gyujtogetos-kartyajatekok/?_s=elite%20trainer%20box&_cat=gyujtogetos-kartyajatekok&_brand=pokemon-tcg&~1",
+    // "https://mythgames.eu/search?filter.p.product_type=Elite+Trainer+Box&options%5Bprefix%5D=last&options%5Bunavailable_products%5D=last&q=elite+trainer+box&sort_by=relevance&type=product",
+
 
     // "https://www.gemklub.hu/index.php?route=product%2Flist&description=0&keyword=elite+trainer+box",
     // "https://pokedom.hu/akcios-termekek-206/elite-trainer-boksz-268",
