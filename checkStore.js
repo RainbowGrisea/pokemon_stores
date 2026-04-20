@@ -23,6 +23,7 @@ function classifyStock(text) {
     "nincs készleten",
     "nincs raktáron",
     "nem elérhető",
+    "nem rendelhető",
     "elfogyott",
     "out of stock",
     "sold out",
@@ -146,6 +147,10 @@ function isMomokoshopUrl(url) {
 
 function isPokedomUrl(url) {
   return /pokedom\.hu/i.test(url || "");
+}
+
+function isReflexshopUrl(url) {
+  return /reflexshop\.hu/i.test(url || "");
 }
 
 function buildGamerunnerSearchUrl(keyword) {
@@ -378,6 +383,38 @@ function extractPokedomProducts($) {
       if (!/In stock|Out of stock/i.test(stock)) return;
 
       const key = normalizeText(href || title);
+      if (seen.has(key)) return;
+
+      seen.add(key);
+      products.push({ title, stock });
+    });
+
+  return products;
+}
+
+function extractReflexshopProducts($) {
+  const products = [];
+  const seen = new Set();
+
+  $("article.product-card")
+    .each((_, element) => {
+      const card = $(element);
+      const titleLink = card.find("a.name-link").first();
+      const title = cleanProductText(titleLink.text() || titleLink.attr("title") || card.text());
+      const context = card.text().replace(/\s+/g, " ").trim();
+
+      if (!title || title.length < 8) return;
+      if (!/pokemon|pok[eé]mon|elite trainer box|etb|booster|tin|collection|box|card/i.test(title)) return;
+
+      const stock = /nem rendelhető|elfogyott|nincs készleten|nincs raktáron|nem elérhető|out of stock|sold out/i.test(context)
+        ? "Out of stock ❌"
+        : /raktáron|készleten|in stock|add to cart/i.test(context)
+          ? "In stock ✅"
+          : "Stock status unclear ⚠️";
+
+      if (!/In stock|Out of stock/i.test(stock)) return;
+
+      const key = normalizeText(title);
       if (seen.has(key)) return;
 
       seen.add(key);
@@ -681,6 +718,26 @@ async function checkStock(url, options = {}) {
         return "No matching products found ❌";
       }
 
+      if (isReflexshopUrl(url)) {
+        const reflexshopProducts = extractReflexshopProducts($);
+        const { products } = formatProducts(reflexshopProducts, options);
+
+        if (products.length > 0) {
+          return products.map(product => `${product.title} - ${product.stock}`).join("\n");
+        }
+
+        if (options.availableOnly && reflexshopProducts.length > 0) {
+          return "No available products found ❌";
+        }
+
+        const pageText = $("body").text();
+        if (hasNoResultsSignal(pageText)) {
+          return "No matching products found ❌";
+        }
+
+        return "No matching products found ❌";
+      }
+
     const productLinks = $("a[href*='pid'], [data-product-id] a[href], .product a[href], .product-item a[href], .product-layout a[href], .product-thumb a[href], .product-grid a[href], .product-list a[href]")
       .map((_, link) => ({
         href: $(link).attr("href"),
@@ -763,10 +820,12 @@ if (require.main === module) {
   const pages = args.filter(arg => !arg.startsWith("--"));
 
   const defaultPages = [
-    "https://www.metagames.hu/gyujtogetos-kartyajatekok/pokemon-tcg?kereses=elite+trainer+box&categoryId=pokemon-tcg&pageSize=48",
-    "https://gamerunner.hu/kereses?description=1&keyword=elite+trainer+box",
-    "https://sportkartyabolt.hu/shop_search.php?search=elite+trainer+box",
-    "https://momokoshop.hu/?s=elite+trainer+box&post_type=product&product_cat&product_count=104",
+    // "https://www.metagames.hu/gyujtogetos-kartyajatekok/pokemon-tcg?kereses=elite+trainer+box&categoryId=pokemon-tcg&pageSize=48",
+    // "https://gamerunner.hu/kereses?description=1&keyword=elite+trainer+box",
+    // "https://sportkartyabolt.hu/shop_search.php?search=elite+trainer+box",
+    // "https://momokoshop.hu/?s=elite+trainer+box&post_type=product&product_cat&product_count=104",
+    // "https://reflexshop.hu/shop_search.php?search=elite+trainer+box",
+
     // "https://pokedom.hu/akcios-termekek-206/elite-trainer-boksz-268",
 
   ];
